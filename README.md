@@ -4,4 +4,4 @@ Can download, recover if something goes wrong or didn't download, asking for new
 #
 Can not download multi-files or upload
 #
-Usage ``` pyhon ./index.py {torrent file path}```
+Usage ```python ./index.py {torrent file path}```
