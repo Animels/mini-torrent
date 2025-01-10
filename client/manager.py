@@ -41,16 +41,25 @@ class PieceManager:
         await self.piece_queue.put(piece)
 
     async def get_qpiece(self):
-        return await self.piece_queue.get()
+        return await asyncio.wait_for(self.piece_queue.get(),timeout=10)
 
     async def put_completed_qpiece(self, piece):
         await self.completed_pieces.put(piece)
 
     async def get_completed_qpiece(self):
-        return await self.completed_pieces.get()
+        return await asyncio.wait_for(self.completed_pieces.get(),timeout=10)
 
     def get_piece_size(self, index):
-        return self.total_length - index * self.piece_length if index == self.total_pieces - 1 else self.piece_length
+        start = index * self.piece_length
+        end = start + self.piece_length
+
+        if end > self.total_length:
+            end = self.total_length
+
+        return end - start
+
+    def check_states(self):
+        return self.get_pieces_states().find(0) == -1 and self.get_pieces_states().find(1) == -1
 
 
 file_lock = asyncio.Lock()
@@ -73,10 +82,9 @@ class WriteManager:
             async with file_lock:
                 while self.written_pieces < self.piece_manager.total_pieces:
                     try:
-                        index, data = await asyncio.wait_for(self.piece_manager.get_completed_qpiece(), timeout=10)
+                        index, data = await self.piece_manager.get_completed_qpiece()
                     except asyncio.TimeoutError:
-                        if (self.piece_manager.get_pieces_states().find(0) == -1
-                                and self.piece_manager.get_pieces_states().find(1) == -1):
+                        if self.piece_manager.check_states():
                             break
                         else:
                             continue
@@ -114,7 +122,6 @@ class WriteManager:
                     source_f.seek(position)
                     data = source_f.read(self.file.get_piece_length())
                     expected_sha = self.file.get_pieces()[20 * piece_index: 20 * (piece_index + 1)]
-
                     if sha1(data).digest() == expected_sha:
                         self.piece_manager.change_piece_state(piece_index, 2)
                         self.written_pieces += 1

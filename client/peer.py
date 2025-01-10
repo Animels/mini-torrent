@@ -53,13 +53,13 @@ class Peer:
         writer = None
         read_task = None
         try:
-            reader, writer, bit_field = await self.establish_connection(self.peer_info)
+            reader, writer, bit_field = await asyncio.wait_for(self.establish_connection(self.peer_info), timeout=20)
             if not reader or not writer:
                 return
 
             read_task = asyncio.create_task(self.read_loop(reader))
 
-            while not self.piece_manager.is_piece_queue_empty():
+            while not self.piece_manager.check_states():
                 index = await self.piece_manager.get_qpiece()
 
                 if self.piece_manager.get_pieces_state(index) != 0:
@@ -122,7 +122,7 @@ class Peer:
         writer.write(request_msg)
         await writer.drain()
 
-        block_with_header = await fut
+        block_with_header = await asyncio.wait_for(fut, timeout=10)
 
         return block_with_header
 
